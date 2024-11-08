@@ -1,45 +1,93 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Agent } from "@/components/types";
-import { Brain, MessageSquare, Users, Bot, ArrowRight } from "lucide-react";
+import { Brain, MessageSquare, Users, Bot, Hash } from "lucide-react";
+import { GameApiHandler } from "@/api/handler";
+import { Message, ThoughtProcess } from "@/api/types";
+
+const apiHandler = new GameApiHandler();
+
+interface GroupedMessages {
+    [round: number]: Message[];
+}
+
+interface GroupedThoughts {
+    [round: number]: {
+        [agentName: string]: ThoughtProcess[];
+    };
+}
 
 export const ChatRooms = ({ agents }: { agents: Agent[] }) => {
-    const [selectedAgent, setSelectedAgent] = useState<number | null>(null);
-    const [selectedChat, setSelectedChat] = useState<number | null>(null);
+    const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+    const [selectedChat, setSelectedChat] = useState<string | null>(null);
+    const [groupedMessages, setGroupedMessages] = useState<GroupedMessages>({});
+    const [groupedThoughts, setGroupedThoughts] = useState<GroupedThoughts>({});
+    const [loading, setLoading] = useState(false);
 
-    // Mock chat data
-    const mockChat = [
-        { agent: 1, otherAgent: 2, message: "I propose we collaborate", thought: "Trying to build trust" },
-        { agent: 2, otherAgent: 1, message: "I accept your proposal", thought: "Seems beneficial for now" },
-        { agent: 1, otherAgent: 2, message: "Great! Let's proceed", thought: "Partnership established" },
-        { agent: 3, otherAgent: 4, message: "Hello agent 4", thought: "Making first contact" },
-        { agent: 4, otherAgent: 3, message: "Hi agent 3", thought: "Being polite" }
-    ];
+    useEffect(() => {
+        const fetchAgentInteractions = async () => {
+            if (!selectedAgent || !selectedChat) return;
 
-    const relevantMessages = selectedAgent && selectedChat
-        ? mockChat.filter(msg =>
-            (msg.agent === selectedAgent && msg.otherAgent === selectedChat) ||
-            (msg.agent === selectedChat && msg.otherAgent === selectedAgent)
-        )
-        : [];
+            setLoading(true);
+            try {
+                const data = await apiHandler.getAgentInteractions(selectedAgent, selectedChat);
 
-    const EmptyState = ({ type, className = "" }: { type: 'chat' | 'thought', className?: string }) => (
-        <div className={`h-full flex flex-col items-center justify-center text-gray-400 ${className}`}>
+                // Group messages by round
+                const messagesByRound = (data.messages || []).reduce((acc: GroupedMessages, msg) => {
+                    if (!acc[msg.round_number]) {
+                        acc[msg.round_number] = [];
+                    }
+                    acc[msg.round_number].push(msg);
+                    return acc;
+                }, {});
+                setGroupedMessages(messagesByRound);
+
+                // Fetch and group thoughts by round and agent
+                const allThoughts = await apiHandler.getAllThoughtProcesses();
+                const relevantThoughts = allThoughts.filter(thought =>
+                    thought.agent_name === selectedAgent || thought.agent_name === selectedChat
+                );
+
+                const thoughtsByRound = relevantThoughts.reduce((acc: GroupedThoughts, thought) => {
+                    if (!acc[thought.round_number]) {
+                        acc[thought.round_number] = {};
+                    }
+                    if (!acc[thought.round_number][thought.agent_name]) {
+                        acc[thought.round_number][thought.agent_name] = [];
+                    }
+                    acc[thought.round_number][thought.agent_name].push(thought);
+                    return acc;
+                }, {});
+                setGroupedThoughts(thoughtsByRound);
+            } catch (error) {
+                console.error('Failed to fetch agent interactions:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAgentInteractions();
+        const interval = setInterval(fetchAgentInteractions, 10000);
+        return () => clearInterval(interval);
+    }, [selectedAgent, selectedChat]);
+
+    const EmptyState = ({ type }: { type: 'chat' | 'thought' }) => (
+        <div className="h-full flex flex-col items-center justify-center text-gray-400 p-8">
             {type === 'chat' ? (
                 <>
                     <MessageSquare className="h-12 w-12 mb-3 opacity-50" />
                     <p className="text-sm font-medium">No messages yet</p>
-                    <p className="text-xs mt-1 max-w-[200px] text-center text-gray-400">
-                        Select an agent to view their conversation history
+                    <p className="text-xs mt-1 max-w-[200px] text-center">
+                        Select agents to view their conversation history
                     </p>
                 </>
             ) : (
                 <>
                     <Brain className="h-12 w-12 mb-3 opacity-50" />
                     <p className="text-sm font-medium">No thoughts recorded</p>
-                    <p className="text-xs mt-1 max-w-[200px] text-center text-gray-400">
+                    <p className="text-xs mt-1 max-w-[200px] text-center">
                         Agent thought processes will appear here
                     </p>
                 </>
@@ -47,15 +95,79 @@ export const ChatRooms = ({ agents }: { agents: Agent[] }) => {
         </div>
     );
 
-    const getTimeString = (index: number) => {
-        const date = new Date();
-        date.setMinutes(date.getMinutes() - (mockChat.length - index) * 2);
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const getTimeString = (timestamp: string) => {
+        return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
+
+    const renderRoundSection = (roundNumber: number, messages: Message[]) => (
+        <div key={roundNumber} className="space-y-3">
+            <div className="flex items-center space-x-2 bg-gray-100 p-2 rounded-lg sticky top-0 ">
+                <Hash className="w-4 h-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-600">Round {roundNumber}</span>
+            </div>
+            {messages.map((msg, i) => (
+                <div
+                    key={i}
+                    className={`flex ${msg.from_agent === selectedAgent ? 'justify-end' : 'justify-start'}`}
+                >
+                    <div
+                        className={`
+                            max-w-[80%] rounded-lg shadow-sm
+                            ${msg.from_agent === selectedAgent
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gray-100'
+                        }
+                        `}
+                    >
+                        <div className="p-3 space-y-1">
+                            <div className="flex items-center space-x-2 mb-1">
+                                <Bot className="w-3 h-3 text-current opacity-70" />
+                                <span className="text-xs font-medium opacity-70">
+                                    {msg.from_agent} → {msg.to_agent}
+                                </span>
+                            </div>
+                            <p className="text-sm">{msg.content}</p>
+                            <p className={`text-xs ${
+                                msg.from_agent === selectedAgent ? 'text-blue-100' : 'text-gray-400'
+                            }`}>
+                                {getTimeString(msg.timestamp)}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+
+    const renderThoughtSection = (roundNumber: number, thoughtsByAgent: { [agent: string]: ThoughtProcess[] }) => (
+        <div key={roundNumber} className="space-y-3">
+            <div className="flex items-center space-x-2 bg-gray-100 p-2 rounded-lg sticky top-0">
+                <Hash className="w-4 h-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-600">Round {roundNumber}</span>
+            </div>
+            {Object.entries(thoughtsByAgent).map(([agentName, thoughts]) => (
+                <div key={agentName} className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                        <Bot className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm font-medium text-gray-600">{agentName}&apos;s Thoughts:</span>
+                    </div>
+                    {thoughts.map((thought, i) => (
+                        <div
+                            key={i}
+                            className="ml-6 p-3 bg-gray-50 rounded-lg border border-gray-100"
+                        >
+                            <p className="text-sm text-gray-600">{thought.content}</p>
+                            <p className="text-xs text-gray-400 mt-1">{getTimeString(thought.timestamp)}</p>
+                        </div>
+                    ))}
+                </div>
+            ))}
+        </div>
+    );
 
     return (
         <Card className="w-full shadow-lg">
-            <CardHeader className="border-b">
+            <CardHeader className="pb-4 border-b">
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle className="text-xl flex items-center space-x-2">
@@ -63,25 +175,22 @@ export const ChatRooms = ({ agents }: { agents: Agent[] }) => {
                             <span>Agent Communications</span>
                         </CardTitle>
                         <CardDescription className="mt-1">
-                            Monitor conversations and thought processes between agents
+                            Monitor conversations and thought processes between agents by round
                         </CardDescription>
                     </div>
-                    {/*<div className="flex items-center space-x-2 text-sm text-gray-500">*/}
-                    {/*    <Clock className="w-4 h-4" />*/}
-                    {/*    <span>Updated </span>*/}
-                    {/*</div>*/}
                 </div>
             </CardHeader>
+
             <CardContent className="p-6">
                 <div className="flex space-x-4 mb-6">
                     <div className="w-[200px]">
-                        <Select onValueChange={(value) => setSelectedAgent(Number(value))}>
-                            <SelectTrigger className="w-full">
+                        <Select onValueChange={setSelectedAgent}>
+                            <SelectTrigger>
                                 <SelectValue placeholder="Select Primary Agent" />
                             </SelectTrigger>
                             <SelectContent>
                                 {agents.map(agent => (
-                                    <SelectItem key={agent.id} value={agent.id.toString()}>
+                                    <SelectItem key={agent.id} value={agent.name}>
                                         <div className="flex items-center space-x-2">
                                             <Bot className="w-4 h-4" />
                                             <span>{agent.name}</span>
@@ -93,17 +202,20 @@ export const ChatRooms = ({ agents }: { agents: Agent[] }) => {
                     </div>
                     {selectedAgent && (
                         <div className="flex space-x-2 animate-in slide-in-from-left">
-                            {agents.filter(a => a.id !== selectedAgent).map(agent => (
-                                <Button
-                                    key={agent.id}
-                                    onClick={() => setSelectedChat(agent.id)}
-                                    variant={selectedChat === agent.id ? "default" : "outline"}
-                                    className="transition-all duration-200 flex items-center space-x-2"
-                                >
-                                    <Bot className="w-4 h-4" />
-                                    <span>Chat with {agent.name}</span>
-                                </Button>
-                            ))}
+                            {agents
+                                .filter(a => a.name !== selectedAgent)
+                                .map(agent => (
+                                    <Button
+                                        key={agent.id}
+                                        onClick={() => setSelectedChat(agent.name)}
+                                        variant={selectedChat === agent.name ? "default" : "outline"}
+                                        className="flex items-center space-x-2"
+                                    >
+                                        <Bot className="w-4 h-4" />
+                                        <span>Chat with {agent.name}</span>
+                                    </Button>
+                                ))
+                            }
                         </div>
                     )}
                 </div>
@@ -118,69 +230,45 @@ export const ChatRooms = ({ agents }: { agents: Agent[] }) => {
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="h-[500px] overflow-y-auto space-y-4 p-4 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-gray-50">
-                                    {relevantMessages.length > 0 ? (
-                                        relevantMessages.map((msg, i) => (
-                                            <div
-                                                key={i}
-                                                className={`flex ${msg.agent === selectedAgent ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2`}
-                                                style={{ animationDelay: `${i * 100}ms` }}
-                                            >
-                                                <div
-                                                    className={`max-w-[80%] group transition-all duration-200 ${
-                                                        msg.agent === selectedAgent
-                                                            ? 'bg-blue-500 text-white'
-                                                            : 'bg-gray-100'
-                                                    }`}
-                                                >
-                                                    <div className="p-3 rounded-lg space-y-1">
-                                                        <p className="text-sm">{msg.message}</p>
-                                                        <p className={`text-xs ${
-                                                            msg.agent === selectedAgent ? 'text-blue-100' : 'text-gray-400'
-                                                        }`}>
-                                                            {getTimeString(i)}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))
+                                <div className="h-[500px] overflow-y-auto space-y-6 p-4">
+                                    {loading ? (
+                                        <div className="flex items-center justify-center h-full">
+                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+                                        </div>
+                                    ) : Object.keys(groupedMessages).length > 0 ? (
+                                        Object.entries(groupedMessages)
+                                            .sort(([a], [b]) => Number(a) - Number(b))
+                                            .map(([round, messages]) =>
+                                                renderRoundSection(Number(round), messages)
+                                            )
                                     ) : (
-                                        <EmptyState type="chat" className="py-12" />
+                                        <EmptyState type="chat" />
                                     )}
                                 </div>
                             </CardContent>
                         </Card>
+
                         <Card className="shadow-sm">
                             <CardHeader className="pb-4">
                                 <CardTitle className="text-lg flex items-center space-x-2">
                                     <Brain className="w-4 h-4 text-blue-500" />
-                                    <span>Thought Process</span>
+                                    <span>Thought Processes</span>
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="h-[500px] overflow-y-auto space-y-4 p-4 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-gray-50">
-                                    {relevantMessages.length > 0 ? (
-                                        relevantMessages.map((msg, i) => (
-                                            <div
-                                                key={i}
-                                                className="p-4 bg-gray-50 rounded-lg border border-gray-100 hover:border-gray-200 transition-colors animate-in slide-in-from-bottom-2"
-                                                style={{ animationDelay: `${i * 100}ms` }}
-                                            >
-                                                <div className="flex items-center space-x-2 mb-2">
-                                                    <Bot className="w-4 h-4 text-gray-400" />
-                                                    <p className="font-medium text-sm text-gray-600">
-                                                        Agent {msg.agent}&apos;s Thought Process:
-                                                    </p>
-                                                </div>
-                                                <div className="flex items-start space-x-2">
-                                                    <ArrowRight className="w-4 h-4 text-gray-400 mt-0.5" />
-                                                    <p className="text-sm text-gray-600">{msg.thought}</p>
-                                                </div>
-                                                <p className="text-xs text-gray-400 mt-2">{getTimeString(i)}</p>
-                                            </div>
-                                        ))
+                                <div className="h-[500px] overflow-y-auto space-y-6 p-4">
+                                    {loading ? (
+                                        <div className="flex items-center justify-center h-full">
+                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+                                        </div>
+                                    ) : Object.keys(groupedThoughts).length > 0 ? (
+                                        Object.entries(groupedThoughts)
+                                            .sort(([a], [b]) => Number(a) - Number(b))
+                                            .map(([round, thoughtsByAgent]) =>
+                                                renderThoughtSection(Number(round), thoughtsByAgent)
+                                            )
                                     ) : (
-                                        <EmptyState type="thought" className="py-12" />
+                                        <EmptyState type="thought" />
                                     )}
                                 </div>
                             </CardContent>

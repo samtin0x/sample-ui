@@ -1,6 +1,12 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Circle, Square, Triangle, Trophy, TrendingUp, Wallet } from "lucide-react";
-import { Agent } from "@/components/types";
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Circle, Square, Triangle, TrendingUp, Wallet, Users, HelpCircle } from "lucide-react";
+import { GameApiHandler } from "@/api/handler";
+import { AgentState } from "@/api/types";
+
+interface AgentStateMap {
+    [key: string]: AgentState;
+}
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -11,105 +17,127 @@ const formatCurrency = (amount: number) => {
     }).format(amount);
 };
 
-export const AgentBalances = ({ agents }: { agents: Agent[] }) => {
-    const getShapeIcon = (shape?: string) => {
-        const iconClass = "w-6 h-6";
-        switch (shape) {
+export const AgentBalances = () => {
+    const [agentStates, setAgentStates] = useState<AgentStateMap>({});
+    const [error, setError] = useState<string | null>(null);
+    const apiHandler = new GameApiHandler();
+
+    const getShapeIcon = (choice?: string) => {
+        const iconClass = "w-5 h-5";
+        const iconColor = choice ? "text-blue-500" : "text-gray-400";
+        switch (choice?.toLowerCase()) {
             case 'circle':
-                return <Circle className={iconClass} />;
+                return <Circle className={`${iconClass} ${iconColor}`} />;
             case 'triangle':
-                return <Triangle className={iconClass} />;
+                return <Triangle className={`${iconClass} ${iconColor}`} />;
             case 'square':
-                return <Square className={iconClass} />;
+                return <Square className={`${iconClass} ${iconColor}`} />;
             default:
-                return null;
+                return <HelpCircle className={`${iconClass} ${iconColor}`} />;
         }
     };
 
-    const maxBalance = Math.max(...agents.map(a => a.balance));
-    const maxWins = Math.max(...agents.map(a => a.wins));
+    const fetchAgentStates = async () => {
+        try {
+            const states = await apiHandler.getAllAgents();
+            setAgentStates(states);
+        } catch (err) {
+            console.error('Failed to fetch agent states:', err);
+            setError(err instanceof Error ? err.message : 'Failed to fetch agent states');
+        }
+    };
+
+    useEffect(() => {
+        fetchAgentStates();
+        const interval = setInterval(fetchAgentStates, 3000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const agentEntries = Object.entries(agentStates);
+    const maxBalance = Math.max(...agentEntries.map(([_, state]) => state.tokens));
+
+    if (error) {
+        return (
+            <div className="p-4 text-red-500">
+                Error loading agent states: {error}
+            </div>
+        );
+    }
 
     return (
-        <div className="relative w-full h-[450px] mb-4">
-            {agents.map((agent, index) => {
-                const positions = [
-                    'top-0 left-0',
-                    'top-0 right-0',
-                    'bottom-0 left-0',
-                    'bottom-0 right-0'
-                ];
+        <div className="grid grid-cols-2 gap-6 w-full max-w-4xl mx-auto">
+            {agentEntries.map(([agentName, state]) => (
+                <Card
+                    key={agentName}
+                    className="w-full transition-all duration-300 hover:scale-102 border border-green-100 hover:border-green-200 relative overflow-hidden"
+                >
+                    {/* Shape Choice Indicator */}
+                    <div className="absolute top-3 right-3 flex items-center space-x-2 bg-gray-50 rounded-full px-3 py-1.5">
+                        <span className="text-xs text-gray-500">Choice</span>
+                        {getShapeIcon(state.choice)}
+                    </div>
 
-                const isTopPerformer = agent.balance === maxBalance;
-                const isTopWinner = agent.wins === maxWins;
+                    <CardHeader className="pb-2">
+                        <div className="flex items-center space-x-2">
+                            <div className="flex-1">
+                                <h3 className="text-lg font-semibold">{agentName}</h3>
+                            </div>
+                            <TrendingUp className="w-4 h-4 text-green-500" />
+                        </div>
+                    </CardHeader>
 
-                return (
-                    <Card
-                        key={agent.id}
-                        className={`
-              absolute w-64 transition-all duration-300 hover:scale-105
-              ${positions[index]}
-              ${isTopPerformer ? 'ring-2 ring-green-400 ring-offset-2' : ''}
-              shadow-lg hover:shadow-xl
-            `}
-                    >
-                        <CardHeader className="pb-4">
-                            <div className="flex items-center justify-between">
+                    <CardContent className="space-y-4">
+                        {/* Balance Section */}
+                        <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                            <div className="flex items-center justify-between text-gray-600">
                                 <div className="flex items-center space-x-2">
-                                    <div className={`
-                    p-2 rounded-lg
-                    ${isTopPerformer ? 'bg-green-100' : 'bg-gray-100'}
-                  `}>
-                                        {getShapeIcon(agent.shape)}
-                                    </div>
-                                    <CardTitle className="text-lg font-bold">
-                                        {agent.name}
-                                    </CardTitle>
+                                    <Wallet className="w-4 h-4" />
+                                    <span className="font-medium">Balance</span>
                                 </div>
-                                {isTopPerformer && (
-                                    <TrendingUp className="w-5 h-5 text-green-500" />
-                                )}
+                                <span className="font-mono font-bold text-green-600">
+                                    {formatCurrency(state.tokens)}
+                                </span>
                             </div>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-2 text-gray-600">
-                                        <Wallet className="w-4 h-4" />
-                                        <span className="text-sm">Balance</span>
-                                    </div>
-                                    <span className={`font-mono font-bold ${isTopPerformer ? 'text-green-600' : ''}`}>
-                    {formatCurrency(agent.balance)}
-                  </span>
-                                </div>
-                                <div className="w-full bg-gray-100 rounded-full h-1.5">
-                                    <div
-                                        className="bg-blue-500 h-1.5 rounded-full transition-all duration-500"
-                                        style={{ width: `${(agent.balance / maxBalance) * 100}%` }}
-                                    />
-                                </div>
+                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                <div
+                                    className="bg-green-500 h-1.5 rounded-full transition-all duration-500"
+                                    style={{ width: `${(state.tokens / maxBalance) * 100}%` }}
+                                />
                             </div>
+                        </div>
 
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-2 text-gray-600">
-                                        <Trophy className="w-4 h-4" />
-                                        <span className="text-sm">Wins</span>
-                                    </div>
-                                    <span className={`font-mono font-bold ${isTopWinner ? 'text-amber-600' : ''}`}>
-                    {agent.wins}
-                  </span>
+                        {/* Allies Section */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between text-gray-600">
+                                <div className="flex items-center space-x-2">
+                                    <Users className="w-4 h-4" />
+                                    <span className="font-medium">Allies</span>
                                 </div>
-                                <div className="w-full bg-gray-100 rounded-full h-1.5">
-                                    <div
-                                        className="bg-amber-500 h-1.5 rounded-full transition-all duration-500"
-                                        style={{ width: `${(agent.wins / (maxWins || 1)) * 100}%` }}
-                                    />
-                                </div>
+                                <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-sm font-medium">
+                                    {state.allies.length}
+                                </span>
                             </div>
-                        </CardContent>
-                    </Card>
-                );
-            })}
+                            {state.allies.length > 0 && (
+                                <div className="mt-1 p-2 bg-gray-50 rounded-lg">
+                                    <div className="text-sm text-gray-600 font-medium">
+                                        Allied with:
+                                    </div>
+                                    <div className="text-sm text-gray-500 mt-1">
+                                        {state.allies.map((ally, index) => (
+                                            <span
+                                                key={ally}
+                                                className="inline-block bg-white px-2 py-1 rounded mr-2 mb-1 text-xs border border-gray-100"
+                                            >
+                                                {ally}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            ))}
         </div>
     );
 };
