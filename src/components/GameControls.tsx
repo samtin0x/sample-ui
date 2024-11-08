@@ -28,9 +28,9 @@ export const GameControls = ({
                         <div
                             key={step}
                             className={`p-4 rounded-lg border ${
-                                step === currentStep
+                                (step === currentStep && isSimulationStarted)
                                     ? 'border-blue-500 bg-blue-50'
-                                    : SIMULATION_STEPS.indexOf(currentStep) > SIMULATION_STEPS.indexOf(step)
+                                    : SIMULATION_STEPS.indexOf(currentStep) > SIMULATION_STEPS.indexOf(step) && isSimulationStarted
                                         ? 'border-green-500 bg-green-50'
                                         : 'border-gray-200'
                             }`}
