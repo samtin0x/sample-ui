@@ -3,7 +3,7 @@ import {AgentState, Deal, GameConfig, GameResponse, GameState, Message, ThoughtP
 export class GameApiHandler {
     private baseUrl: string;
 
-    constructor(baseUrl: string = 'http://localhost:8001') {
+    constructor(baseUrl: string = 'https://starfish-app-qib8o.ondigitalocean.app') {
         this.baseUrl = baseUrl;
     }
 

@@ -5,6 +5,7 @@ import { Play, Check, Clock, AlertCircle, Trophy, Coins, Users, MessageCircle, C
 import { GameApiHandler } from "@/api/handler";
 import { GameState } from "@/api/types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {getShapeIcon} from "@/components/AgentBalances";
 
 const SIMULATION_STEPS = ["Getting to know each other", "Negotiating", "End"] as const;
 type SimulationStep = typeof SIMULATION_STEPS[number];
@@ -194,7 +195,8 @@ export const GameController = ({
                                         <span className="font-medium">Winning Shape</span>
                                     </div>
                                     <div className="text-2xl font-bold text-green-800 flex items-center space-x-2">
-                                        <Circle className="w-6 h-6" />
+                                        {getShapeIcon(gameState.results.winning_shape)
+                                        }
                                         <span>{gameState.results.winning_shape}</span>
                                     </div>
                                 </div>

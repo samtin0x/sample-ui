@@ -17,25 +17,25 @@ const formatCurrency = (amount: number) => {
     }).format(amount);
 };
 
+export const getShapeIcon = (choice?: string) => {
+    const iconClass = "w-5 h-5";
+    const iconColor = choice ? "text-blue-500" : "text-gray-400";
+    switch (choice?.toLowerCase()) {
+        case 'circle':
+            return <Circle className={`${iconClass} ${iconColor}`} />;
+        case 'triangle':
+            return <Triangle className={`${iconClass} ${iconColor}`} />;
+        case 'square':
+            return <Square className={`${iconClass} ${iconColor}`} />;
+        default:
+            return <HelpCircle className={`${iconClass} ${iconColor}`} />;
+    }
+};
+
 export const AgentBalances = () => {
     const [agentStates, setAgentStates] = useState<AgentStateMap>({});
     const [error, setError] = useState<string | null>(null);
     const apiHandler = new GameApiHandler();
-
-    const getShapeIcon = (choice?: string) => {
-        const iconClass = "w-5 h-5";
-        const iconColor = choice ? "text-blue-500" : "text-gray-400";
-        switch (choice?.toLowerCase()) {
-            case 'circle':
-                return <Circle className={`${iconClass} ${iconColor}`} />;
-            case 'triangle':
-                return <Triangle className={`${iconClass} ${iconColor}`} />;
-            case 'square':
-                return <Square className={`${iconClass} ${iconColor}`} />;
-            default:
-                return <HelpCircle className={`${iconClass} ${iconColor}`} />;
-        }
-    };
 
     const fetchAgentStates = async () => {
         try {
