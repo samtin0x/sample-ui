@@ -20,12 +20,16 @@ import { GameApiHandler } from "@/api/handler";
 import { Message, ThoughtProcess } from "@/api/types";
 
 interface GroupedMessages {
-  [round: number]: Message[];
+  [era: number]: {
+    [round: number]: Message[];
+  };
 }
 
 interface GroupedThoughts {
-  [round: number]: {
-    [agentName: string]: ThoughtProcess[];
+  [era: number]: {
+    [round: number]: {
+      [agentName: string]: ThoughtProcess[];
+    };
   };
 }
 
@@ -50,7 +54,7 @@ const RoundSection = ({
   getTimeString,
 }: RoundSectionProps) => (
   <div className="space-y-3">
-    <div className="flex items-center space-x-2 bg-gray-100 p-2 rounded-lg sticky top-0 z-10">
+    <div className="flex items-center space-x-2 bg-gray-100/80 p-2 rounded-lg sticky top-12 z-10 backdrop-blur-sm">
       <Hash className="w-4 h-4 text-gray-500" />
       <span className="text-sm font-medium text-gray-600">
         Round {roundNumber}
@@ -64,13 +68,9 @@ const RoundSection = ({
         >
           <div
             className={`
-                            max-w-[80%] rounded-lg shadow-sm
-                            ${
-                              msg.from_agent === selectedAgent
-                                ? "bg-blue-500 text-white"
-                                : "bg-gray-100"
-                            }
-                        `}
+              max-w-[80%] rounded-lg shadow-sm
+              ${msg.from_agent === selectedAgent ? "bg-blue-500 text-white" : "bg-gray-100"}
+            `}
           >
             <div className="p-3 space-y-1">
               <div className="flex items-center space-x-2 mb-1">
@@ -81,11 +81,7 @@ const RoundSection = ({
               </div>
               <p className="text-sm">{msg.content}</p>
               <p
-                className={`text-xs ${
-                  msg.from_agent === selectedAgent
-                    ? "text-blue-100"
-                    : "text-gray-400"
-                }`}
+                className={`text-xs ${msg.from_agent === selectedAgent ? "text-blue-100" : "text-gray-400"}`}
               >
                 {getTimeString(msg.timestamp)}
               </p>
@@ -94,6 +90,28 @@ const RoundSection = ({
         </div>
       ))}
     </div>
+  </div>
+);
+
+const MessageSection = ({ era, messages, selectedAgent, getTimeString }) => (
+  <div className="space-y-6">
+    <div className="sticky top-0 z-20 bg-white border-b border-gray-200 p-2 rounded-t-lg backdrop-blur-sm">
+      <div className="flex items-center space-x-2">
+        <Hash className="w-5 h-5 text-blue-500" />
+        <span className="text-base font-semibold text-gray-700">Era {era}</span>
+      </div>
+    </div>
+    {Object.entries(messages || {})
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .map(([round, roundMessages]) => (
+        <RoundSection
+          key={round}
+          roundNumber={Number(round)}
+          messages={roundMessages}
+          selectedAgent={selectedAgent}
+          getTimeString={getTimeString}
+        />
+      ))}
   </div>
 );
 
@@ -296,55 +314,63 @@ export const ChatRooms = ({ gameId, era }: ChatRoomsProps) => {
       const allMessages = interactions.messages || [];
       const filteredMessages = allMessages.filter(
         (msg) =>
-          msg.era == era &&
-          ((msg.from_agent === selectedAgent &&
-            msg.to_agent === selectedChat) ||
-            (msg.from_agent === selectedChat &&
-              msg.to_agent === selectedAgent)),
+          (msg.from_agent === selectedAgent && msg.to_agent === selectedChat) ||
+          (msg.from_agent === selectedChat && msg.to_agent === selectedAgent),
       );
 
-      const messagesByRound = filteredMessages.reduce(
+      // Group messages by era and then by round
+      const messagesByEra = filteredMessages.reduce(
         (acc: GroupedMessages, msg) => {
-          if (!acc[msg.round_number]) {
-            acc[msg.round_number] = [];
+          if (!acc[msg.era]) {
+            acc[msg.era] = {};
           }
-          acc[msg.round_number].push(msg);
+          if (!acc[msg.era][msg.round_number]) {
+            acc[msg.era][msg.round_number] = [];
+          }
+          acc[msg.era][msg.round_number].push(msg);
           return acc;
         },
         {},
       );
 
-      Object.values(messagesByRound).forEach((messages) => {
-        messages.sort(
-          (a, b) =>
-            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-        );
+      // Sort messages within each round by timestamp
+      Object.values(messagesByEra).forEach((eraMessages) => {
+        Object.values(eraMessages).forEach((roundMessages) => {
+          roundMessages.sort(
+            (a, b) =>
+              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+          );
+        });
       });
 
-      setGroupedMessages(messagesByRound);
-
+      // Group thoughts by era and round
       const relevantThoughts = thoughts.filter(
         (thought) =>
-          thought.era == era &&
-          (thought.agent_name === selectedAgent ||
-            thought.agent_name === selectedChat),
+          thought.agent_name === selectedAgent ||
+          thought.agent_name === selectedChat,
       );
 
-      const thoughtsByRound = relevantThoughts.reduce(
+      const thoughtsByEra = relevantThoughts.reduce(
         (acc: GroupedThoughts, thought) => {
-          if (!acc[thought.round_number]) {
-            acc[thought.round_number] = {};
+          if (!acc[thought.era]) {
+            acc[thought.era] = {};
           }
-          if (!acc[thought.round_number][thought.agent_name]) {
-            acc[thought.round_number][thought.agent_name] = [];
+          if (!acc[thought.era][thought.round_number]) {
+            acc[thought.era][thought.round_number] = {};
           }
-          acc[thought.round_number][thought.agent_name].push(thought);
+          if (!acc[thought.era][thought.round_number][thought.agent_name]) {
+            acc[thought.era][thought.round_number][thought.agent_name] = [];
+          }
+          acc[thought.era][thought.round_number][thought.agent_name].push(
+            thought,
+          );
           return acc;
         },
         {},
       );
 
-      setGroupedThoughts(thoughtsByRound);
+      setGroupedMessages(messagesByEra);
+      setGroupedThoughts(thoughtsByEra);
     } catch (err) {
       console.error("Failed to fetch interactions:", err);
       setError(
@@ -450,60 +476,26 @@ export const ChatRooms = ({ gameId, era }: ChatRoomsProps) => {
               <CardContent>
                 <div
                   ref={chatScrollRef}
-                  className="h-[500px] overflow-y-auto space-y-6 p-4"
+                  className="h-[500px] overflow-y-auto space-y-6"
                 >
                   {loading ? (
                     <div className="flex items-center justify-center h-full">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
                     </div>
-                  ) : Object.keys(groupedMessages).length > 0 ? (
-                    Object.entries(groupedMessages)
+                  ) : Object.entries(groupedMessages || {}).length > 0 ? (
+                    Object.entries(groupedMessages || {})
                       .sort(([a], [b]) => Number(a) - Number(b))
-                      .map(([round, messages]) => (
-                        <RoundSection
-                          key={round}
-                          roundNumber={Number(round)}
+                      .map(([era, messages]) => (
+                        <MessageSection
+                          key={era}
+                          era={Number(era)}
                           messages={messages}
-                          selectedAgent={selectedAgent!}
+                          selectedAgent={selectedAgent}
                           getTimeString={getTimeString}
                         />
                       ))
                   ) : (
                     <EmptyState type="chat" />
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg flex items-center space-x-2">
-                  <Brain className="w-4 h-4 text-blue-500" />
-                  <span>Thought Processes</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div
-                  ref={thoughtScrollRef}
-                  className="h-[500px] overflow-y-auto space-y-6 p-4"
-                >
-                  {loading ? (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
-                    </div>
-                  ) : Object.keys(groupedThoughts).length > 0 ? (
-                    Object.entries(groupedThoughts)
-                      .sort(([a], [b]) => Number(a) - Number(b))
-                      .map(([round, thoughtsByAgent]) => (
-                        <ThoughtSection
-                          key={round}
-                          roundNumber={Number(round)}
-                          thoughtsByAgent={thoughtsByAgent}
-                          getTimeString={getTimeString}
-                        />
-                      ))
-                  ) : (
-                    <EmptyState type="thought" />
                   )}
                 </div>
               </CardContent>

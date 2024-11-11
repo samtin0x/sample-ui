@@ -90,13 +90,13 @@ export const AgentBalances = ({ gameId }: AgentBalancesProps) => {
     );
   }
 
-  // if (error) {
-  //   return (
-  //     <Alert variant="destructive" className="m-4">
-  //       <AlertDescription>Error: {error}</AlertDescription>
-  //     </Alert>
-  //   );
-  // }
+  if (error) {
+    return (
+      <Alert variant="destructive" className="m-4">
+        <AlertDescription>Error: {error}</AlertDescription>
+      </Alert>
+    );
+  }
 
   const agentEntries = Object.entries(agentStates);
 
