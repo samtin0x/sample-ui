@@ -99,11 +99,11 @@ const GameSetup = ({ onGameStart }: GameSetupProps) => {
           </div>
         </CardHeader>
         <CardContent className="space-y-8">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          {/*{error && (*/}
+          {/*  <Alert variant="destructive">*/}
+          {/*    <AlertDescription>{error}</AlertDescription>*/}
+          {/*  </Alert>*/}
+          {/*)}*/}
 
           <Alert className="bg-blue-50 border-blue-200">
             <AlertDescription className="text-sm text-blue-700">

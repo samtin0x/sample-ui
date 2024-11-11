@@ -149,12 +149,12 @@ export default function GamePage() {
 
         <Separator />
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        {/*{error && (*/}
+        {/*  <Alert variant="destructive">*/}
+        {/*    <AlertCircle className="h-4 w-4" />*/}
+        {/*    <AlertDescription>{error}</AlertDescription>*/}
+        {/*  </Alert>*/}
+        {/*)}*/}
 
         {!gameState.started ? (
           <div className="space-y-6">
