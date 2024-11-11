@@ -1,14 +1,32 @@
-import {ChatRooms} from "@/components/ChatRooms";
-import {AgentBalances} from "@/components/AgentBalances";
-import {Agent} from "@/components/types";
+import React from "react";
+import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AgentBalances from "@/components/AgentBalances";
+import ChatRooms from "@/components/ChatRooms";
 
-const GameInterface = ({ agents }: { agents: Agent[] }) => {
-    return (
-        <div className="p-6 space-y-6">
-            <AgentBalances agents={agents} />
-            <ChatRooms agents={agents} />
-        </div>
-    );
+interface GameInterfaceProps {
+  gameId: string;
+}
+
+export const GameInterface = ({ gameId }: GameInterfaceProps) => {
+  return (
+    <div className="">
+      <Tabs defaultValue="balances" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="balances">Agent Balances</TabsTrigger>
+          <TabsTrigger value="chat">Communications</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="balances">
+          <AgentBalances gameId={gameId} />
+        </TabsContent>
+
+        <TabsContent value="chat">
+          <ChatRooms gameId={gameId} />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
 };
 
 export default GameInterface;
