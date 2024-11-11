@@ -241,7 +241,7 @@ export const GameController = ({
                 : `Round ${currentRound} of ${SIMULATION_STEPS.length - 1}`}
           </div>
           <div className="space-x-2">
-            {getButtonText() && (
+            {(!isGameComplete && getButtonText()) && (
               <Button
                 onClick={handleNextRound}
                 disabled={isProcessing}
@@ -275,7 +275,7 @@ export const GameController = ({
                 ) : (
                   <RefreshCw className="w-4 h-4 mr-2" />
                 )}
-                Play Again
+                New round
               </Button>
             )}
           </div>
