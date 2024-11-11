@@ -141,6 +141,7 @@ const ThoughtSection = ({
 
 interface ChatRoomsProps {
   gameId: string;
+  era: number;
 }
 
 const EmptyState = ({ type }: { type: "chat" | "thought" }) => (
@@ -165,9 +166,7 @@ const EmptyState = ({ type }: { type: "chat" | "thought" }) => (
   </div>
 );
 
-// ... (previous imports and interfaces remain the same)
-
-export const ChatRooms = ({ gameId }: ChatRoomsProps) => {
+export const ChatRooms = ({ gameId, era }: ChatRoomsProps) => {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const [groupedMessages, setGroupedMessages] = useState<GroupedMessages>({});
@@ -178,6 +177,7 @@ export const ChatRooms = ({ gameId }: ChatRoomsProps) => {
   const [initialLoad, setInitialLoad] = useState(true);
   const [loading, setLoading] = useState(false);
 
+  const loadingTimerRef = useRef<NodeJS.Timeout>();
   const apiHandler = useRef(new GameApiHandler());
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const thoughtScrollRef = useRef<HTMLDivElement>(null);
@@ -186,7 +186,22 @@ export const ChatRooms = ({ gameId }: ChatRoomsProps) => {
   const fetchIntervalRef = useRef<NodeJS.Timeout>();
   const agentIntervalRef = useRef<NodeJS.Timeout>();
 
-  // Save scroll positions before updating data
+  const setLoadingDebounced = (isLoading: boolean) => {
+    if (loadingTimerRef.current) {
+      clearTimeout(loadingTimerRef.current);
+    }
+
+    if (!isLoading) {
+      loadingTimerRef.current = setTimeout(() => {
+        setLoading(false);
+      }, 500);
+    } else {
+      loadingTimerRef.current = setTimeout(() => {
+        setLoading(true);
+      }, 200);
+    }
+  };
+
   const saveScrollPositions = useRef(() => {
     if (chatScrollRef.current) {
       chatScrollPosition.current = chatScrollRef.current.scrollTop;
@@ -196,7 +211,6 @@ export const ChatRooms = ({ gameId }: ChatRoomsProps) => {
     }
   });
 
-  // Restore scroll positions after updating data
   const restoreScrollPositions = useRef(() => {
     if (chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollPosition.current;
@@ -206,7 +220,6 @@ export const ChatRooms = ({ gameId }: ChatRoomsProps) => {
     }
   });
 
-  // Fetch agents
   useEffect(() => {
     if (!gameId) return;
 
@@ -243,28 +256,31 @@ export const ChatRooms = ({ gameId }: ChatRoomsProps) => {
     };
   }, [gameId]);
 
-  // Fetch interactions when agents are selected
   useEffect(() => {
     if (!gameId || !selectedAgent || !selectedChat) return;
 
-    const fetchData = async () => {
-      await fetchAgentInteractions();
-    };
-
-    fetchData();
-    fetchIntervalRef.current = setInterval(fetchData, 3000);
+    fetchAgentInteractions();
+    fetchIntervalRef.current = setInterval(fetchAgentInteractions, 3000);
 
     return () => {
       if (fetchIntervalRef.current) {
         clearInterval(fetchIntervalRef.current);
       }
     };
-  }, [gameId, selectedAgent, selectedChat]);
+  }, [gameId, selectedAgent, selectedChat, era]);
+
+  useEffect(() => {
+    return () => {
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current);
+      }
+    };
+  }, []);
 
   const fetchAgentInteractions = async () => {
     if (!gameId || !selectedAgent || !selectedChat) return;
 
-    setLoading(true);
+    setLoadingDebounced(true);
     saveScrollPositions.current();
 
     try {
@@ -277,15 +293,16 @@ export const ChatRooms = ({ gameId }: ChatRoomsProps) => {
         apiHandler.current.getAllThoughtProcesses(gameId),
       ]);
 
-      // Get all messages between the selected agents
       const allMessages = interactions.messages || [];
       const filteredMessages = allMessages.filter(
         (msg) =>
-          (msg.from_agent === selectedAgent && msg.to_agent === selectedChat) ||
-          (msg.from_agent === selectedChat && msg.to_agent === selectedAgent),
+          msg.era == era &&
+          ((msg.from_agent === selectedAgent &&
+            msg.to_agent === selectedChat) ||
+            (msg.from_agent === selectedChat &&
+              msg.to_agent === selectedAgent)),
       );
 
-      // Group messages by round
       const messagesByRound = filteredMessages.reduce(
         (acc: GroupedMessages, msg) => {
           if (!acc[msg.round_number]) {
@@ -297,7 +314,6 @@ export const ChatRooms = ({ gameId }: ChatRoomsProps) => {
         {},
       );
 
-      // Sort messages within each round by timestamp
       Object.values(messagesByRound).forEach((messages) => {
         messages.sort(
           (a, b) =>
@@ -307,11 +323,11 @@ export const ChatRooms = ({ gameId }: ChatRoomsProps) => {
 
       setGroupedMessages(messagesByRound);
 
-      // Process thoughts - keep only thoughts from selected agents
       const relevantThoughts = thoughts.filter(
         (thought) =>
-          thought.agent_name === selectedAgent ||
-          thought.agent_name === selectedChat,
+          thought.era == era &&
+          (thought.agent_name === selectedAgent ||
+            thought.agent_name === selectedChat),
       );
 
       const thoughtsByRound = relevantThoughts.reduce(
@@ -328,16 +344,6 @@ export const ChatRooms = ({ gameId }: ChatRoomsProps) => {
         {},
       );
 
-      // Sort thoughts within each round by timestamp
-      Object.values(thoughtsByRound).forEach((agentThoughts) => {
-        Object.values(agentThoughts).forEach((thoughts) => {
-          thoughts.sort(
-            (a, b) =>
-              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-          );
-        });
-      });
-
       setGroupedThoughts(thoughtsByRound);
     } catch (err) {
       console.error("Failed to fetch interactions:", err);
@@ -345,12 +351,11 @@ export const ChatRooms = ({ gameId }: ChatRoomsProps) => {
         err instanceof Error ? err.message : "Failed to fetch interactions",
       );
     } finally {
-      setLoading(false);
+      setLoadingDebounced(false);
       setTimeout(restoreScrollPositions.current, 0);
     }
   };
 
-  // Reset scroll positions when changing agents
   const handleAgentSelect = (value: string) => {
     setSelectedAgent(value);
     setSelectedChat(null);
@@ -367,20 +372,6 @@ export const ChatRooms = ({ gameId }: ChatRoomsProps) => {
     chatScrollPosition.current = 0;
     thoughtScrollPosition.current = 0;
   };
-
-  // Scroll to bottom on initial load of new messages
-  useEffect(() => {
-    if (Object.keys(groupedMessages).length > 0 && initialLoad) {
-      if (chatScrollRef.current) {
-        chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-      }
-      if (thoughtScrollRef.current) {
-        thoughtScrollRef.current.scrollTop =
-          thoughtScrollRef.current.scrollHeight;
-      }
-      setInitialLoad(false);
-    }
-  }, [groupedMessages, initialLoad]);
 
   if (isLoading || initialLoad) {
     return (
@@ -400,8 +391,8 @@ export const ChatRooms = ({ gameId }: ChatRoomsProps) => {
               <span>Agent Communications</span>
             </CardTitle>
             <CardDescription className="mt-1">
-              Monitor conversations and thought processes between agents by
-              round
+              Monitor conversations and thought processes between agents for Era{" "}
+              {era}
             </CardDescription>
           </div>
         </div>

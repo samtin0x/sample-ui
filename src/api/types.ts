@@ -9,6 +9,7 @@ export interface Game {
     allies: string[];
   }[];
   current_round: number | null;
+  era: number | null;
 }
 
 export interface AgentConfig {
@@ -43,6 +44,7 @@ export interface Message {
   content: string;
   timestamp: string;
   round_number: number;
+  era: number;
 }
 
 export interface ThoughtProcess {
@@ -50,6 +52,7 @@ export interface ThoughtProcess {
   content: string;
   timestamp: string;
   round_number: number;
+  era: number;
 }
 
 export interface Deal {
@@ -63,6 +66,7 @@ export interface Deal {
 
 export interface GameState {
   current_round: number;
+  era: number;
   game_status: string;
   agent_states: {
     [key: string]: {

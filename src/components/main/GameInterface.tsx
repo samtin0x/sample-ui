@@ -6,9 +6,10 @@ import ChatRooms from "@/components/ChatRooms";
 
 interface GameInterfaceProps {
   gameId: string;
+  era: number;
 }
 
-export const GameInterface = ({ gameId }: GameInterfaceProps) => {
+export const GameInterface = ({ gameId, era }: GameInterfaceProps) => {
   return (
     <div className="">
       <Tabs defaultValue="balances" className="w-full">
@@ -22,7 +23,7 @@ export const GameInterface = ({ gameId }: GameInterfaceProps) => {
         </TabsContent>
 
         <TabsContent value="chat">
-          <ChatRooms gameId={gameId} />
+          <ChatRooms gameId={gameId} era={era} />
         </TabsContent>
       </Tabs>
     </div>

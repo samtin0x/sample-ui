@@ -73,6 +73,7 @@ export default function GamePage() {
       setGameState({
         started: true,
         gameId,
+        era: 1,
         simulationStarted: false,
         currentStep: "Getting to know each other",
       });
@@ -104,6 +105,7 @@ export default function GamePage() {
       setGameState({
         started: true,
         gameId,
+        era: selectedGame.era,
         simulationStarted: selectedGame.current_round !== null,
         currentStep: "Getting to know each other", // You might want to derive this from game state
       });
@@ -196,7 +198,7 @@ export default function GamePage() {
                 </div>
 
                 <GameController gameId={gameState.gameId} />
-                <GameInterface gameId={gameState.gameId} />
+                <GameInterface gameId={gameState.gameId} era={gameState.era} />
               </>
             )}
           </div>

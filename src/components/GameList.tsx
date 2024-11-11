@@ -75,6 +75,10 @@ const GameList = ({
                       </div>
                     </div>
                     <div className="flex justify-between items-center">
+                      <div className="text-sm font-medium">Era:</div>
+                      <div className="text-sm text-gray-500">{game.era}</div>
+                    </div>
+                    <div className="flex justify-between items-center">
                       <div className="text-sm font-medium">Ticket Price:</div>
                       <div className="text-sm text-gray-500">
                         {game.ticket_price}

@@ -83,7 +83,6 @@ export class GameApiHandler {
   }
 
   async getAllAgents(gameId: string): Promise<Record<string, AgentState>> {
-    console.log("Fetching all agents for game:", gameId);
     if (!gameId) {
       throw new Error("Game ID is required");
     }

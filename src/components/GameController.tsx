@@ -12,6 +12,7 @@ import {
   MessageCircle,
   Loader2,
   RefreshCw,
+  Hash,
 } from "lucide-react";
 import { GameApiHandler } from "@/api/handler";
 import { GameState } from "@/api/types";
@@ -56,6 +57,7 @@ export const GameController = ({
 }: GameControllerProps) => {
   const [gameState, setGameState] = useState<GameState>({
     current_round: -1,
+    era: 1,
     game_status: "not_started",
     is_processing: false,
     agent_states: {},
@@ -167,10 +169,18 @@ export const GameController = ({
   return (
     <Card className="shadow-lg">
       <CardHeader className="pb-4">
-        <CardTitle className="text-xl font-bold flex items-center space-x-2">
-          <Clock className="w-5 h-5 text-blue-500" />
-          <span>Game Progress</span>
-        </CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-xl font-bold flex items-center space-x-2">
+            <Clock className="w-5 h-5 text-blue-500" />
+            <span>Game Progress</span>
+          </CardTitle>
+          <div className="flex items-center space-x-2 bg-blue-50 px-3 py-1.5 rounded-full">
+            <Hash className="w-4 h-4 text-blue-500" />
+            <span className="text-sm font-medium text-blue-700">
+              Era {gameState.era}
+            </span>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {error && (
@@ -241,7 +251,7 @@ export const GameController = ({
                 : `Round ${currentRound} of ${SIMULATION_STEPS.length - 1}`}
           </div>
           <div className="space-x-2">
-            {(!isGameComplete && getButtonText()) && (
+            {!isGameComplete && getButtonText() && (
               <Button
                 onClick={handleNextRound}
                 disabled={isProcessing}
